@@ -13,13 +13,12 @@ COLOR_BLACK = '#000000'
 
 def draw_diagram(dist_cm, eye_level_cm, tv_bottom_cm, tv_height_cm, tv_centre_cm, vert_angle_deg):
     """
-    Generates a side-view diagram of the TV setup (Vertical/Side Profile).
+    Generates a side-view diagram of the TV setup.
     """
     fig, ax = plt.subplots(figsize=(10, 5))
     
     # --- SETUP CANVAS ---
     ax.set_xlim(-50, dist_cm + 100)
-    # Dynamic ceiling height
     room_height = max(250, tv_bottom_cm + tv_height_cm + 50)
     ax.set_ylim(0, room_height)
     ax.set_aspect('equal')
@@ -44,40 +43,43 @@ def draw_diagram(dist_cm, eye_level_cm, tv_bottom_cm, tv_height_cm, tv_centre_cm
     ax.add_patch(tv_rect)
     ax.text(-15, tv_centre_cm, "TV", ha='right', va='center', fontsize=12, fontweight='bold', color=COLOR_DARK_BLUE)
 
-    # --- DRAW VIEWER (Human) ---
-    # Head
+    # --- DRAW VIEWER ---
     ax.scatter(dist_cm, eye_level_cm, s=200, color=COLOR_BLACK, zorder=5)
-    # Body (Stick figure)
-    ax.plot([dist_cm, dist_cm], [eye_level_cm, eye_level_cm - 60], color=COLOR_BLACK, linewidth=3) # Spine
-    ax.plot([dist_cm, dist_cm - 20], [eye_level_cm - 30, eye_level_cm - 60], color=COLOR_BLACK, linewidth=3) # Legs
+    # Body
+    ax.plot([dist_cm, dist_cm], [eye_level_cm, eye_level_cm - 60], color=COLOR_BLACK, linewidth=3)
+    ax.plot([dist_cm, dist_cm - 20], [eye_level_cm - 30, eye_level_cm - 60], color=COLOR_BLACK, linewidth=3)
     ax.text(dist_cm, eye_level_cm + 25, "Eye Level", ha='center', fontsize=10, color=COLOR_BLACK)
 
     # --- DRAW GUIDES ---
     
-    # 1. Horizontal Eye Line (0 degrees)
+    # 1. Horizontal Eye Line
     ax.plot([0, dist_cm], [eye_level_cm, eye_level_cm], color='gray', linestyle='--', alpha=0.4)
     
     # 2. Sight Line
     ax.plot([0, dist_cm], [tv_centre_cm, eye_level_cm], color=COLOR_MED_BLUE, linestyle='--', alpha=0.8, linewidth=1.5)
     
-    # 3. Vertical Angle Arc
-    arc_diam = dist_cm * 0.4
-    angle_patch = patches.Arc(
-        (dist_cm, eye_level_cm), 
-        width=arc_diam, 
-        height=arc_diam, 
-        angle=0, 
-        theta1=180-vert_angle_deg, 
-        theta2=180, 
-        color=COLOR_RED, 
-        linewidth=2
-    )
-    ax.add_patch(angle_patch)
-    
-    # Angle Label (Vertical)
-    label_x = dist_cm - (arc_diam/2 * 1.15 * math.cos(math.radians(vert_angle_deg/2)))
-    label_y = eye_level_cm + (arc_diam/2 * 1.15 * math.sin(math.radians(vert_angle_deg/2)))
-    ax.text(label_x, label_y, f"{vert_angle_deg:.1f}°", color=COLOR_RED, fontsize=9, fontweight='bold', ha='center')
+    # 3. Vertical Angle Arc (Only if angle > 0.5 degrees)
+    if vert_angle_deg > 0.5:
+        arc_diam = dist_cm * 0.4
+        angle_patch = patches.Arc(
+            (dist_cm, eye_level_cm), 
+            width=arc_diam, 
+            height=arc_diam, 
+            angle=0, 
+            theta1=180-vert_angle_deg, 
+            theta2=180, 
+            color=COLOR_RED, 
+            linewidth=2
+        )
+        ax.add_patch(angle_patch)
+        
+        # Angle Label
+        label_x = dist_cm - (arc_diam/2 * 1.15 * math.cos(math.radians(vert_angle_deg/2)))
+        label_y = eye_level_cm + (arc_diam/2 * 1.15 * math.sin(math.radians(vert_angle_deg/2)))
+        ax.text(label_x, label_y, f"{vert_angle_deg:.1f}°", color=COLOR_RED, fontsize=9, fontweight='bold', ha='center')
+    else:
+        # If standard (0 degrees), text sits right on the line
+        ax.text(dist_cm/2, eye_level_cm + 5, "0° (Neutral Neck)", color='gray', fontsize=8, ha='center')
 
     # 4. Mounting Height Indicator
     ax.plot([20, 20], [0, tv_bottom_cm], color=COLOR_MED_BLUE, linestyle='-', linewidth=1)
@@ -88,7 +90,7 @@ def draw_diagram(dist_cm, eye_level_cm, tv_bottom_cm, tv_height_cm, tv_centre_cm
     ax.plot([0, dist_cm], [10, 10], color='gray', linestyle='-')
     ax.text(dist_cm / 2, 25, f"{dist_cm/100:.2f} m", ha='center', color='gray')
 
-    ax.set_title("Room Side View (Vertical Profile)", fontsize=10, loc='left', color=COLOR_DARK_BLUE)
+    ax.set_title(f"Side View", fontsize=10, loc='left', color=COLOR_DARK_BLUE)
 
     return fig
 
@@ -96,19 +98,21 @@ def main():
     st.set_page_config(page_title="Ideal TV Height Calculator", page_icon="📺")
     
     st.title("📺 Ideal TV Height Calculator")
-    st.markdown(
-        """
-        Calculate the ideal mounting height and viewing distance.  
-        Implements **SMPTE/THX** standards for distance and **KEF formulas** for height.
-        """
-    )
+    st.markdown("Calculate the ideal mounting height for your living room setup.")
     
     st.divider()
 
-    # --- INPUTS ---
+    # --- SECTION 1: PREFERENCES ---
     st.header("1. Your Setup")
-    col1, col2 = st.columns(2)
     
+    # Setup Mode Selector
+    setup_mode = st.radio(
+        "Setup Style",
+        ["Standard Living Room (Ergonomic)", "Home Theater (Reclined)"],
+        help="**Standard:** TV Center aligns with Eye Level (Neutral neck). Best for couches.\n\n**Home Theater:** TV mounted higher to look up (like a cinema). Best for recliners."
+    )
+
+    col1, col2 = st.columns(2)
     with col1:
         tv_size_inch = st.number_input("TV Size (Diagonal inches)", 32, 120, 65, step=1, format="%d")
 
@@ -119,39 +123,39 @@ def main():
             max_value=150.0, 
             value=92.0, 
             step=1.0,
-            help="Measure from the floor to your eyes while seated in your normal viewing position."
+            help="Measure from floor to eyes while seated. Standard couch height is usually 90-100cm."
         )
 
-    # --- VIEWING ANGLE STANDARDS (HORIZONTAL) ---
-    st.subheader("Viewing Standard (Horizontal Field of View)")
+    # --- SECTION 2: VIEWING ANGLE ---
+    st.subheader("Field of View (Horizontal)")
     
     angle_help = """
-    **30° (SMPTE):** Standard recommendation for mixed usage (Movies, TV, Sports).  
-    **36° (THX):** Recommended for a more immersive, cinema-like experience.  
-    **40°:** Limit recommended for pure cinema immersion (Screen fills most of your vision).
+    **30° (SMPTE):** The standard for mixed use (TV, Sports, Gaming).  
+    **36° (THX):** Recommended for movies.  
+    **40°:** Cinema limit.
     """
     
     angle_standard = st.radio(
-        "Select your preferred immersion level:",
+        "Select your preferred immersion:",
         options=[30, 36, 40],
         format_func=lambda x: f"{x}° ({'SMPTE Standard' if x==30 else 'THX Recommended' if x==36 else 'Cinema Limit'})",
         horizontal=True,
         help=angle_help
     )
-    
-    # --- MATH: SCREEN DIMENSIONS (16:9) ---
+
+    # --- CALCULATIONS ---
+    # Screen Math
     screen_width_inch = tv_size_inch * 0.87157
     screen_height_inch = tv_size_inch * 0.4903
     screen_width_cm = screen_width_inch * 2.54
     screen_height_cm = screen_height_inch * 2.54
 
-    # --- MATH: RECOMMENDED DISTANCE ---
-    # Distance = (Width / 2) / tan(Angle / 2)
+    # Distance Math (Horizontal Angle)
     angle_rad = math.radians(angle_standard)
     rec_dist_inches = (screen_width_inch / 2) / math.tan(angle_rad / 2)
     rec_dist_m = (rec_dist_inches * 2.54) / 100
     
-    # --- DISTANCE OVERRIDE ---
+    # Distance Input
     st.write("") 
     use_manual_dist = st.checkbox("I sit at a different distance")
     
@@ -161,20 +165,26 @@ def main():
         dist_source_label = "Your Distance"
     else:
         final_dist_m = rec_dist_m
-        dist_source_label = f"Recommended Distance"
-
-    # --- CALCULATIONS: HEIGHT ---
-    final_dist_cm = final_dist_m * 100
+        dist_source_label = "Recommended Distance"
     
-    # KEF Formula: EL + (VD * 0.22) = TVH
-    tv_centre_height_cm = eye_level_cm + (final_dist_cm * 0.22)
+    final_dist_cm = final_dist_m * 100
+
+    # --- HEIGHT LOGIC BRANCH ---
+    if setup_mode == "Standard Living Room (Ergonomic)":
+        # Ergonomic Standard: Center of TV = Eye Level
+        tv_centre_height_cm = eye_level_cm
+        vert_angle_deg = 0.0
+        mode_note = "Standard mode aligns the TV center directly with your eyes."
+    else:
+        # KEF / Theater Mode: Center = EL + (VD * 0.22)
+        tv_centre_height_cm = eye_level_cm + (final_dist_cm * 0.22)
+        vert_angle_rad = math.atan(0.22)
+        vert_angle_deg = math.degrees(vert_angle_rad)
+        mode_note = "Theater mode lifts the TV ~12° for a reclined viewing angle."
+
     tv_bottom_height_cm = tv_centre_height_cm - (screen_height_cm / 2)
     
-    # Vertical Angle
-    vert_angle_rad = math.atan(0.22)
-    vert_angle_deg = math.degrees(vert_angle_rad)
-
-    # --- CALCULATIONS: ACTUAL HORIZONTAL ANGLE ---
+    # Calculate Actual Horizontal Angle
     act_horiz_angle_rad = 2 * math.atan((screen_width_cm / 2) / final_dist_cm)
     act_horiz_angle_deg = math.degrees(act_horiz_angle_rad)
 
@@ -190,43 +200,33 @@ def main():
     with r1_col2:
         st.success(f"**Height to Bottom of TV**\n\n# {tv_bottom_height_cm:.1f} cm")
         
-    # Row 2: Secondary Metrics (Angles) - Perfectly Aligned
+    # Row 2: Secondary Metrics (Angles)
     r2_col1, r2_col2 = st.columns(2)
     
     with r2_col1:
-        # Check delta
         delta_val = None
-        delta_color = "normal"
         if use_manual_dist:
-            diff = act_horiz_angle_deg - angle_standard
-            delta_val = f"{diff:.1f}° vs Target"
-            # If diff is negative (further away), standard metric colors it red (down).
-            # If positive (closer), green (up).
-            
+             delta_val = f"{act_horiz_angle_deg - angle_standard:.1f}° vs Target"
+             
         st.metric(
             label="Horizontal Viewing Angle (Width)", 
             value=f"{act_horiz_angle_deg:.1f}°",
             delta=delta_val,
-            help="The angle the screen width occupies in your field of vision. SMPTE recommends 30°."
+            help="How much of your field of view is filled by the screen width."
         )
 
     with r2_col2:
         st.metric(
             label="Vertical Mounting Angle (Height)", 
             value=f"{vert_angle_deg:.1f}°", 
-            help="The angle you look UP to see the center of the screen. KEF recommends ~12.4° for a reclined position."
+            help="The angle you look UP to see the center. 0° is neutral (straight ahead)."
         )
 
-    if tv_bottom_height_cm > 100:
-        st.warning(
-            "⚠️ **Note on Height:** This result may seem high compared to standard TV stands. "
-            "This formula assumes a **home theatre reclined posture** (looking up). "
-            "For a standard upright living room setup, consider mounting 15-20cm lower."
-        )
+    st.caption(f"ℹ️ {mode_note}")
 
     # --- DIAGRAM ---
     st.divider()
-    st.subheader("Side View (Vertical Layout)")
+    st.subheader("Side View")
     fig = draw_diagram(
         dist_cm=final_dist_cm,
         eye_level_cm=eye_level_cm,
@@ -239,17 +239,24 @@ def main():
 
     # --- DETAILS ---
     with st.expander("See Calculation Breakdown"):
-        st.markdown(f"""
-        ### 1. Distance (Horizontal FOV)
-        *   **Standard:** {angle_standard}° ({'SMPTE' if angle_standard==30 else 'THX'})
-        *   **TV Width:** {screen_width_cm:.1f} cm
-        *   **Formula:** $Distance = \\frac{{Width}}{{2 \\cdot \\tan(Angle/2)}}$
+        st.markdown(f"### 1. Distance Calculation")
+        st.write(f"*Targeting {angle_standard}° Horizontal Field of View.*")
+        st.latex(r"Distance = \frac{\text{Width}}{2 \cdot \tan(\text{Angle}/2)}")
         
-        ### 2. Height (Vertical Angle)
-        *   **Eye Level:** {eye_level_cm} cm
-        *   **Formula:** $Centre = EL + (Distance \\times 0.22)$
-        *   **Result:** The $0.22$ factor calculates a {vert_angle_deg:.1f}° upward angle for comfortable reclined viewing.
-        """)
+        st.markdown(f"### 2. Height Calculation ({setup_mode})")
+        st.write(f"**Eye Level:** {eye_level_cm} cm")
+        st.write(f"**Screen Height:** {screen_height_cm:.1f} cm")
+        
+        if setup_mode == "Standard Living Room (Ergonomic)":
+            st.write("**Formula:** $Centre = EyeLevel$")
+            st.write("This places the center of the screen exactly at your neutral gaze.")
+        else:
+            st.write("**Formula:** $Centre = EyeLevel + (Distance \\times 0.22)$")
+            st.write("This places the center higher to account for leaning back.")
+            
+        st.markdown("**Final Step:**")
+        st.latex(r"Bottom = Centre - (\text{TV Height} / 2)")
+        st.code(f"{tv_centre_height_cm:.1f} - {screen_height_cm/2:.1f} = {tv_bottom_height_cm:.1f} cm")
 
 if __name__ == "__main__":
     main()
